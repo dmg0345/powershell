@@ -17,7 +17,9 @@ function Start-FastCov
 {
     <#
     .DESCRIPTION
-        Runs fastcov and lcov afterwards to generate a coverage report, deleting all existing coverage files on start.
+        Runs fastcov to collect coverage files and generates a HTML report afterwards.
+        
+        All existing coverage files are deleted as a result of this call.
 
     .PARAMETER FastCovExe
         Path to the 'fastcov' executable.
@@ -26,7 +28,7 @@ function Start-FastCov
         Path to the lcov 'genhtml' executable.
 
     .PARAMETER Include
-        Filtes for the files to include in the HTML report.
+        Filters for the files to include in the HTML report.
 
     .PARAMETER CoverageDir
         Folder where to store the coverage data and reports.
@@ -96,7 +98,7 @@ function Start-FastCov
 
     # Run fastcov again to delete all coverage files.
     Write-Log "Deleting existing coverage files...";
-    & "$FastCovExe" --zerocounters --verbose --search-directory "$CMakeBuildDir";
+    & "$FastCovExe" --zerocounters --search-directory "$CMakeBuildDir";
     if ($LASTEXITCODE -ne 0)
     {
         throw "fastcov deletion of existing files finished with error '$LASTEXITCODE'.";
@@ -107,6 +109,7 @@ function Start-FastCov
     Write-Log "Generating coverage HTML report...";
     & "$LCovGenHTMLExe" `
         --output-directory "$CoverageDir" `
+        --prefix "$PWD" `
         --show-details `
         --function-coverage `
         --branch-coverage `

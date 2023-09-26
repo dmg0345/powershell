@@ -18,11 +18,11 @@ function Start-DoxygenSphinx
     <#
     .DESCRIPTION
         Runs 'doxygen' and 'sphinx' to generate documentation for C/C++ projects. Note that Sphinx, for a given
-        set of source files, header files and reStructured text files, it can return false positives.
+        set of source files, header files and reStructured text files, can return false positives.
 
-        The build directories for Doxygen and Sphinx will be in the configuration file, in '.doxygen_build' folder
-        and '.sphinx_build' folder respectively. Note this must be consistent in the 'conf.py' and 'doxyfile'
-        configuration files.
+        The build directories for Doxygen and Sphinx will be in the configuration folder, in '.doxygen_build' folder
+        and '.sphinx_build' folder respectively. Note this must be consistent with the 'conf.py' and 'doxyfile'
+        configuration files in the same configuration folder.
 
     .PARAMETER DoxygenExe
         Path to the 'doxygen' executable.
@@ -98,7 +98,7 @@ function Start-DoxygenSphinx
     Write-Log "Doxygen execution finished successfully." "Success";
 
     # Run Sphinx, specifying the build directory.
-    Write-Log "Running Sphinx, ensure warnings are not false positives...";
+    Write-Log "Running Sphinx...";
     $env:BUILDDIR = "$sphinxBuildPath";
     sphinx-build -j auto -v -W -b "html" "$ConfigFolder" "$HTMLOutputFolder";
     $env:BUILDDIR = $null;
