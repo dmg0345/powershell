@@ -34,7 +34,10 @@ function Start-CppCheck
         Path to the 'cppcheck-htmlreport' executable.
 
     .PARAMETER CppCheckRulesFile
-        Path to the MISRA rules file, this file is confidential and should not be distributed.
+        Optional path to the MISRA rules file, this file is confidential and should not be distributed. If provided
+        and it does not exist it will behave as if it was not provided.
+
+        When not provided, only the MISRA rule identifier is displayed.
 
     .PARAMETER SuppressionXML
         Path to the XML file with the suppressions.
@@ -81,8 +84,7 @@ function Start-CppCheck
         [String]
         $CppCheckHTMLReportExe,
 
-        [Parameter(Mandatory = $true)]
-        [ValidateNotNullOrEmpty()]
+        [Parameter(Mandatory = $false)]
         [String]
         $CppCheckRulesFile,
         [Parameter(Mandatory = $true)]
@@ -141,15 +143,21 @@ function Start-CppCheck
         $fileFilterExpr += "--file-filter=$item";
     }
 
-    # Ensure the path to the MISRA rules exists explicitly.
-    if (-not (Test-Path $CppCheckRulesFile))
+    # Check if the MISRA rules were given and if they exist.
+    if ((-not $PSBoundParameters.ContainsKey("CppCheckRulesFile")) -or (-not (Test-Path $CppCheckRulesFile)))
     {
-        throw "The path to the CppCheck MIRSA rules file '$CppCheckRulesFile' does not exist.";
+        # Create MISRA JSON file in the build folder, with no additional arguments.
+        $misraJSONContents = @"
+{
+    "script": "misra.py",
+    "args": []
+}
+"@;
     }
-
-    # Create MISRA JSON file in the build folder, and set the path to the CppCheck MISRA rules.
-    $misraJSONFile = Join-Path -Path "$CppCheckBuildDir" -ChildPath "!misra.json";
-    Set-Content -Force -Path $misraJSONFile -Value @"
+    else
+    {
+        # MISRA JSON contents with the path to the rules.
+        $misraJSONContents = @"
 {
     "script": "misra.py",
     "args": [
@@ -157,6 +165,10 @@ function Start-CppCheck
     ]
 }
 "@;
+    }
+    # Create MISRA JSON file in the build folder.
+    $misraJSONFile = Join-Path -Path "$CppCheckBuildDir" -ChildPath "!misra.json";
+    Set-Content -Force -Path $misraJSONFile -Value $misraJSONContents;
     $misraJSONFile = (Resolve-Path $misraJSONFile).Path;
 
     # Run CppCheck and generate an XML report with the results, also make it return a specific error code if
@@ -201,7 +213,10 @@ function Start-CppCheck
     # Check if CppCheck found errors, and in that case report them.
     if ($cppCheckLastExitCode -ne 0)
     {
-        throw "doc8 finished with error '$LASTEXITCODE', check output for details.";
+        # On error, print the errors, the contents of the XML file, to the standard output, as CppCheck does not
+	# print anything to the standard output when it finds errors if generating XML.
+        Get-Content -Path "$outputXMLFile" | Write-Output;
+        throw "CppCheck finished with error '$LASTEXITCODE', check output for details.";
     }
     Write-Log "Finished running CppCheck, no errors found." "Success";
 }
