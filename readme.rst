@@ -9,8 +9,9 @@ The `modules` folder contains:
 
 - *linters.psm1*, functionality related to linting tools such as *cppcheck*, *clang-tidy* or *doc8*.
 - *documentation.psm1*, functionality related to documentation tools such as *doxygen* or *sphinx*.
-- *coverage.psm1*, functionality related to code coverage tools such as *fastcov*.
+- *tests.psm1*, functionality related to test and coverage tools such as *fastcov*, *cmocka* or *junit2html*.
 - *devcontainers.psm1*, functionality related to *docker*, *docker-compose*, *vscode* and *devcontainers*.
 - *commons.psm1*, functionality common to all modules or that does not fit anywhere else.
 
-This repository is meant to be included as a submodule by other repositories making use of these scripts.
+This repository is meant to be included as a submodule by other repositories making use of these scripts, and the
+scripts meant to be run from the root directory of the parent repository.
