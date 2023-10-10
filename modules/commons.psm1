@@ -260,9 +260,52 @@ function New-CopyItem
     Write-Log "Copied item from '$((Resolve-Path $Source).Path)' to '$((Resolve-Path $Destination).Path)'..." "Success";
 }
 
+########################################################################################################################
+function New-JSONC
+{
+    <#
+    .DESCRIPTION
+        Parses a JSON with comments, stripping them out and then returning a normal JSON object.
+        
+        JSON files with comments usually have the '.jsonc' extension.
+        
+        Based on: https://stackoverflow.com/a/57092959/21951997.
+
+    .PARAMETER JSONCPath
+        The path to the file with JSON with comments.
+
+    .OUTPUTS
+        A hashtable representing the JSON contents.
+
+    .EXAMPLE
+        New-JSONC -JSONCPath "file.jsonc";
+    #>
+    param(
+        [Parameter(Mandatory = $true)]
+        [String]
+        $JSONCPath
+    )
+    
+    # Ensure path to the JSONC file exists.
+    if (-not (Test-Path "$JSONCPath"))
+    {
+        throw "Path '$JSONCPath' does not exist.";
+    }
+    
+    # Get contents and comment everything out.
+    $cnts = Get-Content -Path "$JSONCPath" -Raw;
+    $cnts = $cnts -replace '(?m)(?<=^([^"]|"[^"]*")*)//.*';
+    $cnts = $cnts -replace '(?ms)/\*.*?\*/';
+    
+    # Return as hashtable object.
+    return $cnts | ConvertFrom-Json;
+}
+
 # [Execution] ##########################################################################################################
 Export-ModuleMember Write-Log;
 Export-ModuleMember Write-StandardOutput;
 
 Export-ModuleMember New-SymbolicLink;
 Export-ModuleMember New-CopyItem;
+
+Export-ModuleMember New-JSONC;

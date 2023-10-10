@@ -104,11 +104,11 @@ function Initialize-DevContainer
         }
     }
 
-    # Create images and run containers, use the cache for the images but recreate the containers.
+    # Create images and run containers, do not use cache for the images and recreate containers if they exist.
     # Note that devcontainer does not modify the last exit code, query the 'vscode' container creation for success.
-    Write-Log "Building images and development containers, running until healthy...";
+    Write-Log "Building images and development containers with no cache, running until healthy...";
     $env:COMPOSE_PROJECT_NAME = $ProjectName;
-    & "devcontainer" up --config "$DevcontainerFile" --remove-existing-container;
+    & "devcontainer" up --config "$DevcontainerFile" --remove-existing-container --build-no-cache --log-level "debug";
     $vscodeContainerID = & "docker-compose" --project-name "$ProjectName" ps --all --quiet "vscode";
     if (-not $vscodeContainerID)
     {
@@ -191,6 +191,12 @@ function Start-DevContainer
         $Inputs
     )
 
+    # Ensure path to configuration files exist.
+    if (-not (Test-Path "$DevcontainerFile"))
+    {
+        throw "'$DevcontainerFile' file does not exist.";
+    }
+
     # Handle input artifacts.
     if ($PSBoundParameters.ContainsKey("Inputs"))
     {
@@ -201,11 +207,16 @@ function Start-DevContainer
         }
     }
 
-    # Start development container, and check if it is running by checking the 'vscode' service, as the devcontainer
-    # utility does not set the $LASTEXITCODE variable.
-    $env:COMPOSE_PROJECT_NAME = $ProjectName;
+    # Use 'docker-compose' rather than the devcontainer CLI to create the development container, as the latter does not
+    # work well with images, attempting to rebuild them when there are features. In this case, do not build or pull
+    # images, expect them all to exist locally already to avoid side-effects.
+    #
+    # This implies that if using features, when building the image the resulting Dockerfile with the feature, see the
+    # log-level when building for details, need to be inspected for initialization scripts of the feature, and those
+    # added might need to be executed manually from the terminal within VSCode.
     Write-Log "Starting development container '$ProjectName'...";
-    & "devcontainer" up --config "$DevcontainerFile";
+    & "docker-compose" --project-directory "$(Split-Path "$DevcontainerFile" -Parent)" --project-name "$ProjectName" `
+        up --detach --no-build --no-recreate --pull "never" --wait;
     $vscodeContainerID = & "docker-compose" --project-name "$ProjectName" ps --all --quiet "vscode";
     $isRunning = & "docker" ps --filter "id=$($vscodeContainerID)" --filter "status=running" --quiet --no-trunc;
     if (-not $isRunning)
@@ -215,6 +226,7 @@ function Start-DevContainer
 
     # Open development container.
     Write-Log "Opening folder '$PWD' in Visual Studio code and development container...";
+    $env:COMPOSE_PROJECT_NAME = $ProjectName;
     & "devcontainer" open "$PWD" --disable-telemetry;
     $env:COMPOSE_PROJECT_NAME = $null;
 }
