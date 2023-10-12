@@ -8,6 +8,9 @@
 # Stop script on first error found.
 $ErrorActionPreference = "Stop";
 
+# Imports.
+Import-Module "$PSScriptRoot/commons.psm1";
+
 # [Declarations] #######################################################################################################
 
 # [Internal Functions] #################################################################################################
@@ -384,8 +387,179 @@ function Start-Doc8
     Write-Log "Finished running doc8, no errors found." "Success";
 }
 
+########################################################################################################################
+function Start-Pylint
+{
+    <#
+    .DESCRIPTION
+        Runs Pylint project wide reporting the errors and warnings to the standard output.
+
+    .PARAMETER PylintExe
+        Path to the 'pylint' executable.
+
+    .PARAMETER ConfigFile
+        Path to the 'pyproject.toml' configuration file.
+
+    .PARAMETER Inputs
+        Directories and/or files to run pylint on, there will be a separate execution for each pylint input.
+
+    .OUTPUTS
+        This function does not return a value.
+
+    .EXAMPLE
+        Start-Pylint -PylintExe "pylint" -ConfigFile "pyproject.toml" -Inputs @("src", "tests")
+    #>
+    param (
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [String]
+        $PylintExe,
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [String]
+        $ConfigFile,
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [String[]]
+        $Inputs
+    )
+
+    Write-Log "Running pylint...";
+    foreach ($input in $Inputs)
+    {
+        # Check that item exists.
+        if (-not (Test-Path "$input"))
+        {
+            throw "The directory or file '$input' does not exist.";
+        }
+        # Run Pylint on file or folder.
+        Write-Log "Running pylint on '$input'...";
+        & "$PylintExe" --rcfile "$ConfigFile" --verbose "$input";
+        if ($LASTEXITCODE -ne 0)
+        {
+            throw "Pylint finished with error '$LASTEXITCODE', check output for details.";
+        }
+    }
+    Write-Log "Finished running pylint, no errors found." "Success";
+}
+
+########################################################################################################################
+function Start-Pyright
+{
+    <#
+    .DESCRIPTION
+        Runs Pyright project wide reporting the errors and warnings to the standard output.
+
+    .PARAMETER PyrightExe
+        Path to the 'pyright' executable.
+
+    .PARAMETER ConfigFile
+        Path to the 'pyproject.toml' configuration file.
+
+    .PARAMETER Inputs
+        Directories and/or files to run pyright on, there will be a separate execution for each pyright input.
+
+    .OUTPUTS
+        This function does not return a value.
+
+    .EXAMPLE
+        Start-Pyright -PyrightExe "pyright" -ConfigFile "pyproject.toml" -Inputs @("src", "tests")
+    #>
+    param (
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [String]
+        $PyrightExe,
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [String]
+        $ConfigFile,
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [String[]]
+        $Inputs
+    )
+
+    Write-Log "Running pyright...";
+    foreach ($input in $Inputs)
+    {
+        # Check that item exists.
+        if (-not (Test-Path "$input"))
+        {
+            throw "The directory or file '$input' does not exist.";
+        }
+        # Run Pylint on file or folder.
+        Write-Log "Running pyright on '$input'...";
+        & "$PyrightExe" --warnings --project "$ConfigFile" --verbose "$input";
+        if ($LASTEXITCODE -ne 0)
+        {
+            throw "Pyright finished with error '$LASTEXITCODE', check output for details.";
+        }
+    }
+    Write-Log "Finished running pyright, no errors found." "Success";
+}
+
+########################################################################################################################
+function Start-Black
+{
+    <#
+    .DESCRIPTION
+        Runs black project wide reporting the errors and warnings to the standard output.
+
+    .PARAMETER BlackExe
+        Path to the 'black' executable.
+
+    .PARAMETER ConfigFile
+        Path to the 'pyproject.toml' configuration file.
+
+    .PARAMETER Inputs
+        Directories and/or files to run black on, there will be a separate execution for each black input.
+
+    .OUTPUTS
+        This function does not return a value.
+
+    .EXAMPLE
+        Start-Black -BlackExe "black" -ConfigFile "pyproject.toml" -Inputs @("src", "tests")
+    #>
+    param (
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [String]
+        $BlackExe,
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [String]
+        $ConfigFile,
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [String[]]
+        $Inputs
+    )
+
+    Write-Log "Running black...";
+    foreach ($input in $Inputs)
+    {
+        # Check that item exists.
+        if (-not (Test-Path "$input"))
+        {
+            throw "The directory or file '$input' does not exist.";
+        }
+        # Run black on file or folder.
+        Write-Log "Running black on '$input'...";
+        & "$BlackExe" --config "$ConfigFile" --check "$input";
+        if ($LASTEXITCODE -ne 0)
+        {
+            throw "Black finished with error '$LASTEXITCODE', check output for details.";
+        }
+    }
+    Write-Log "Finished running black, no errors found." "Success";
+}
+
 # [Execution] ##########################################################################################################
 Export-ModuleMember Start-CppCheck;
 Export-ModuleMember Start-ClangTidy;
 Export-ModuleMember Start-ClangFormat;
 Export-ModuleMember Start-Doc8;
+Export-ModuleMember Start-Pylint;
+Export-ModuleMember Start-Pyright;
+Export-ModuleMember Start-Black;

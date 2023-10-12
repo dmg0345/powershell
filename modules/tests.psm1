@@ -8,6 +8,9 @@
 # Stop script on first error found.
 $ErrorActionPreference = "Stop";
 
+# Imports.
+Import-Module "$PSScriptRoot/commons.psm1";
+
 # [Declarations] #######################################################################################################
 
 # [Internal Functions] #################################################################################################
