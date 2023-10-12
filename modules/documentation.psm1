@@ -8,11 +8,84 @@
 # Stop script on first error found.
 $ErrorActionPreference = "Stop";
 
+# Imports.
+Import-Module "$PSScriptRoot/commons.psm1";
+
 # [Declarations] #######################################################################################################
 
 # [Internal Functions] #################################################################################################
 
 # [Functions] ##########################################################################################################
+function Start-Sphinx
+{
+    <#
+    .DESCRIPTION
+        Runs 'sphinx' to generate documentation for Python projects.
+
+        The build directories for Sphinx will be in the configuration folder, in '.sphinx_build' folder respectively.
+        Note this must be consistent with the 'conf.py' configuration file in the same configuration folder.
+
+    .PARAMETER SphinxBuildExe
+        Path to the 'sphinx-build' executable.
+
+    .PARAMETER ConfigFolder
+        Path to the root folder where the 'conf.py' file is located, and where the '.rst' files are stored.
+
+    .PARAMETER HTMLOutput
+        Folder where the HTML output will be stored.
+
+    .OUTPUTS
+        This function does not return a value.
+
+    .EXAMPLE
+        Start-Sphinx -SphinxBuildExe "sphinx-build" -ConfigFolder "doc" -HTMLOutput "doc/.output"
+    #>
+    param (
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [String]
+        $SphinxBuildExe,
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [String]
+        $ConfigFolder,
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [String]
+        $HTMLOutputFolder
+    )
+
+    # Ensure paths to the configuration file exist.
+    $confPath = Join-Path -Path "$ConfigFolder" -ChildPath "conf.py";
+    if (-not (Test-Path "$confPath"))
+    {
+        throw "Path '$confPath' does not exist.";
+    }
+
+    # If paths to the build and output folders exist, create them anew.
+    $sphinxBuildPath = Join-Path -Path "$ConfigFolder" -ChildPath ".sphinx_build";
+    foreach ($item in @($sphinxBuildPath, $HTMLOutputFolder))
+    {
+        if (Test-Path "$item")
+        {
+            Remove-Item -Path "$item" -Force -Recurse;
+        }
+        New-Item -Path "$item" -ItemType "Directory" -Force | Out-Null;
+    }
+
+    # Run Sphinx, specifying the build directory.
+    Write-Log "Running Sphinx...";
+    $env:BUILDDIR = "$sphinxBuildPath";
+    sphinx-build -j auto -v -W -b "html" "$ConfigFolder" "$HTMLOutputFolder";
+    $env:BUILDDIR = $null;
+    if ($LASTEXITCODE -ne 0)
+    {
+        throw "Sphinx execution finished with error '$LASTEXITCODE'.";
+    }
+    Write-Log "Sphinx execution finished, documentation built with no errors." "Success";
+}
+
+########################################################################################################################
 function Start-DoxygenSphinx
 {
     <#
@@ -64,28 +137,20 @@ function Start-DoxygenSphinx
         $HTMLOutputFolder
     )
 
-    # Ensure paths to the configuration files exist.
+    # Ensure paths to the configuration file exists.
     $doxyfilePath = Join-Path -Path "$ConfigFolder" -ChildPath "doxyfile";
-    $confPath = Join-Path -Path "$ConfigFolder" -ChildPath "conf.py";
-    foreach ($item in @($doxyfilePath, $confPath))
+    if (-not (Test-Path "$doxyfilePath"))
     {
-        if (-not (Test-Path "$item"))
-        {
-            throw "Path '$item' does not exist.";
-        }
+        throw "Path '$doxyfilePath' does not exist.";
     }
 
     # If paths to the build and output folders exist, create them anew.
-    $sphinxBuildPath = Join-Path -Path "$ConfigFolder" -ChildPath ".sphinx_build";
     $doxygenBuildPath = Join-Path -Path "$ConfigFolder" -ChildPath ".doxygen_build";
-    foreach ($item in @($sphinxBuildPath, $doxygenBuildPath, $HTMLOutputFolder))
+    if (Test-Path "$doxygenBuildPath")
     {
-        if (Test-Path "$item")
-        {
-            Remove-Item -Path "$item" -Force -Recurse;
-        }
-        New-Item -Path "$item" -ItemType "Directory" -Force | Out-Null;
+        Remove-Item -Path "$doxygenBuildPath" -Force -Recurse;
     }
+    New-Item -Path "$doxygenBuildPath" -ItemType "Directory" -Force | Out-Null;
 
     # Run Doxygen by feeding it from the standard input, to override command arguments.
     Write-Log "Running Doxygen...";
@@ -98,16 +163,9 @@ function Start-DoxygenSphinx
     Write-Log "Doxygen execution finished successfully." "Success";
 
     # Run Sphinx, specifying the build directory.
-    Write-Log "Running Sphinx...";
-    $env:BUILDDIR = "$sphinxBuildPath";
-    sphinx-build -j auto -v -W -b "html" "$ConfigFolder" "$HTMLOutputFolder";
-    $env:BUILDDIR = $null;
-    if ($LASTEXITCODE -ne 0)
-    {
-        throw "Sphinx execution finished with error '$LASTEXITCODE'.";
-    }
-    Write-Log "Sphinx execution finished, documentation built with no errors." "Success";
+    Start-Sphinx -SphinxBuildExe "$SphinxBuildExe" -ConfigFolder "$ConfigFolder" -HTMLOutput "$HTMLOutputFolder";
 }
 
 # [Execution] ##########################################################################################################
 Export-ModuleMember Start-DoxygenSphinx;
+Export-ModuleMember Start-Sphinx;
