@@ -40,10 +40,6 @@ function Initialize-DevContainer
                 "srcPath" = "/path/to/source";
                 "destPath" = "/path/to/dest/";
             };
-            "input_2" = @{
-                "srcPath" = "/path/to/source";
-                "destPath" = "/path/to/dest";
-            };
         }
 
         The 'destPath' must be a path in the build context of the services to build.
@@ -55,10 +51,6 @@ function Initialize-DevContainer
             "output_1" = @{
                 "containerPath" = "/path/to/source";
                 "hostPath" = "/path/to/dest/";
-            };
-            "output_2" = @{
-                "containerPath" = "/path/to/source";
-                "hostPath" = "/path/to/dest";
             };
         }
 
@@ -86,7 +78,7 @@ function Initialize-DevContainer
         $Outputs
     )
 
-    Write-Log "Building development container at '$DevcontainerFile'...";
+    Write-Log "Building development container images at '$DevcontainerFile'...";
 
     # Ensure path to configuration files exist.
     if (-not (Test-Path "$DevcontainerFile"))
@@ -124,7 +116,7 @@ function Initialize-DevContainer
         throw "Failed to stop development container with error '$LASTEXITCODE'.";
     }
 
-    # Handle output artifacts.
+    # Handle output artifacts after stopping the containers.
     if ($PSBoundParameters.ContainsKey("Outputs"))
     {
         foreach ($key in $Outputs.Keys)
@@ -137,8 +129,16 @@ function Initialize-DevContainer
             }
         }
     }
+    
+    # When finished, remove development containers created, and keep the images.
+    Write-Log "Removing development containers created and attached volumes...";
+    & "docker-compose" --project-name "$ProjectName" down --volumes;
+    if ($LASTEXITCODE -ne 0)
+    {
+        throw "Failed to remove development containers with error '$LASTEXITCODE'.";
+    }
 
-    Write-Log "Development containers created successfully." "Success";
+    Write-Log "Development container images created successfully." "Success";
 }
 
 ########################################################################################################################
@@ -165,20 +165,16 @@ function Start-DevContainer
         This script can be used for example to clone the target repository.
 
     .PARAMETER Inputs
-        Input artifacts that will be copied accross after starting the development container, they follow the format:
+        Input artifacts that will be copied accross when development container is created, they follow the format:
 
         @{
             "input_1" = @{
                 "hostPath" = "/path/to/source";
-                "workspacePath" = "relative_path/to/dest/";
-            };
-            "input_2" = @{
-                "hostPath" = "/path/to/source";
-                "workspacePath" = "relative_path/to/dest";
             };
         }
 
-        The 'workspacePath' is relative to the workspace folder.
+        The artifacts are copied to "/vol_store" folder, from there, they can be interacted with from the
+        initialization script.
 
     .OUTPUTS
         This function does not return a value.
@@ -232,37 +228,49 @@ function Start-DevContainer
         throw "The field 'workspaceFolder' must be specified in '$DevcontainerFile'.";
     }
 
-    # Handle initialization script.
-    if ($PSBoundParameters.ContainsKey("VolumeInitScript"))
+    # Determine if the 'vscode' volume, is empty or not before copying the artifacts and running the
+    # initialization script, if it is already initialized, then skip this step.
+    $isInitialized = (& "docker-compose" --project-name "$ProjectName" exec --workdir "$workspaceFolder" "vscode" `
+        pwsh -Command "ls").Length -gt 0;
+    if (-not ($isInitialized))
     {
-        # Determine if the 'vscode' volume, is empty or not before running the initialization script.
-        $isEmpty = (& "docker-compose" --project-name "$ProjectName" exec --workdir "$workspaceFolder" "vscode" `
-            pwsh -Command 'ls').Length -eq 0;
-        if ($isEmpty)
+        # Handle input artifacts.
+        if ($PSBoundParameters.ContainsKey("Inputs"))
         {
-            # Since the workspace is empty, run the initialization script.
-            Write-Log "Running initialization script for 'vscode' volume...";
-            & "docker-compose" --project-name "$ProjectName" exec --workdir "$workspaceFolder" "vscode" pwsh -Command `
-                "$VolumeInitScript";
+            # Create folder for artifacts to be copied.
+            & "docker-compose" --project-name "$ProjectName" exec --workdir "$workspaceFolder" "vscode" `
+                pwsh -Command "New-Item -Force -ItemType 'Directory' -Path '/vol_store' | Out-Null;";
             if ($LASTEXITCODE -ne 0)
             {
-                throw "Initialization script for volume failed with error '$LASTEXITCODE'.";
+                throw "Failed to create 'vol_store' folder with error '$LASTEXITCODE'.";
+            }
+            
+            foreach ($key in $Inputs.Keys)
+            {
+                # Get name of artifact and copy it to the temporary folder.
+                $artifactName = Split-Path -Path "$($Inputs.$key.hostPath)" -Leaf;
+                Write-Log "Copying input artifact '$key' from host to container...";
+                & "docker" cp "$($Inputs.$key.hostPath)" "$($vscodeContainerID):/vol_store/$artifactName";
+                if ($LASTEXITCODE -ne 0)
+                {
+                    throw "Failed to copy artifact from host to development container with error '$LASTEXITCODE'.";
+                }
             }
         }
-    }
-
-    # Handle input artifacts.
-    if ($PSBoundParameters.ContainsKey("Inputs"))
-    {
-        foreach ($key in $Inputs.Keys)
+        
+        # Handle initialization script.
+        if ($PSBoundParameters.ContainsKey("VolumeInitScript"))
         {
-            Write-Log "Copying input artifact '$key' from host to container...";
-            & "docker" cp `
-                "$($Inputs.$key.hostPath)" `
-                "$($vscodeContainerID):$workspaceFolder/$($Inputs.$key.workspacePath)";
-            if ($LASTEXITCODE -ne 0)
+            if (-not $isInitialized)
             {
-                throw "Failed to copy artifact from host to development container with error '$LASTEXITCODE'.";
+                # Since the workspace is empty, run the initialization script.
+                Write-Log "Running initialization script for 'vscode' volume...";
+                & "docker-compose" --project-name "$ProjectName" exec --workdir "$workspaceFolder" "vscode" pwsh -Command `
+                    "$VolumeInitScript";
+                if ($LASTEXITCODE -ne 0)
+                {
+                    throw "Initialization script for volume failed with error '$LASTEXITCODE'.";
+                }
             }
         }
     }
