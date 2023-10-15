@@ -229,7 +229,7 @@ function Start-DevContainer
     {
         # Create temporary folder for artifacts copied.
         & "docker-compose" --project-name "$ProjectName" exec --workdir "$workspaceFolder" "vscode" `
-            pwsh -Command "New-Item -Force -ItemType 'Directory' -Path '/temp' | Out-Null";
+            pwsh -Command "New-Item -Force -ItemType 'Directory' -Path '/temp' | Out-Null;";
         
         foreach ($key in $Inputs.Keys)
         {
@@ -265,6 +265,14 @@ function Start-DevContainer
                 throw "Initialization script for volume failed with error '$LASTEXITCODE'.";
             }
         }
+    }
+    
+    # Handle input artifacts.
+    if ($PSBoundParameters.ContainsKey("Inputs"))
+    {
+        # Remove temporary folder.
+        & "docker-compose" --project-name "$ProjectName" exec --workdir "$workspaceFolder" "vscode" `
+            pwsh -Command "Remove-Item -Force -Recurse -Path '/temp';";
     }
 
     # Open development container.
