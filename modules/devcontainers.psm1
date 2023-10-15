@@ -240,7 +240,7 @@ function Start-DevContainer
             }
             
             # Get name of artifact and copy it to the temporary folder.
-            $artifactName = Split-Path -Path "$Inputs.$key.hostPath" -Leaf;
+            $artifactName = Split-Path -Path "$($Inputs.$key.hostPath)" -Leaf;
             Write-Log "Copying input artifact '$key' from host to container...";
             & "docker" cp "$($Inputs.$key.hostPath)" "$($vscodeContainerID):/temp/$artifactName";
             if ($LASTEXITCODE -ne 0)
