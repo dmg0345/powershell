@@ -239,11 +239,10 @@ function Start-DevContainer
                 continue;
             }
             
-            # Copy artifact.
+            # Get name of artifact and copy it to the temporary folder.
+            $artifactName = Split-Path -Path "$Inputs.$key.hostPath" -Leaf;
             Write-Log "Copying input artifact '$key' from host to container...";
-            & "docker" cp `
-                "$($Inputs.$key.hostPath)" `
-                "$($vscodeContainerID):/temp/$(Split-Path -Path "$Inputs.$key.hostPath" -Leaf)";
+            & "docker" cp "$($Inputs.$key.hostPath)" "$($vscodeContainerID):/temp/$artifactName";
             if ($LASTEXITCODE -ne 0)
             {
                 throw "Failed to copy artifact from host to development container with error '$LASTEXITCODE'.";
