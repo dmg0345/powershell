@@ -213,13 +213,17 @@ function Start-CppCheck
     }
     Write-Log "Finished running CppCheck HTML report." "Success";
 
+    # Get contents of the XML file, some errors are not reported as errors, but rather as warnings, not returning
+    # an error on exit.
+    $errCount = ([xml](Get-Content -Path "$outputXMLFile")).results.errors.error.Count;
+
     # Check if CppCheck found errors, and in that case report them.
-    if ($cppCheckLastExitCode -ne 0)
+    if (($cppCheckLastExitCode -ne 0) -or ($errCount -ne 0))
     {
         # On error, print the errors, the contents of the XML file, to the standard output, as CppCheck does not
-	# print anything to the standard output when it finds errors if generating XML.
+        # print anything to the standard output when it finds errors if generating XML.
         Get-Content -Path "$outputXMLFile" | Write-Output;
-        throw "CppCheck finished with error '$LASTEXITCODE', check output for details.";
+        throw "CppCheck finished with error '$cppCheckLastExitCode' and '$errCount' errors, check output for details.";
     }
     Write-Log "Finished running CppCheck, no errors found." "Success";
 }
