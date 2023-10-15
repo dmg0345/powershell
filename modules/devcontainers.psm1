@@ -162,12 +162,11 @@ function Start-DevContainer
         @{
             "input_1" = @{
                 "hostPath" = "/path/to/source";
-                "workspacePath" = "relative_path/to/dest/";
-                "volumeInitOnly" = "Optional, copy artifact on volume initialization only.";
+                "volumeInitOnly" = "Optional, the artifact is only copied when the volume is initialized.";
             };
         }
 
-        The 'workspacePath' is relative to the workspace folder.
+        The artifacts are copied to the "/temp" folder, which is erased after this function finished.
 
     .OUTPUTS
         This function does not return a value.
@@ -223,11 +222,15 @@ function Start-DevContainer
 
     # Determine if the 'vscode' volume, is empty or not before running the initialization script.
     $isInitialized = (& "docker-compose" --project-name "$ProjectName" exec --workdir "$workspaceFolder" "vscode" `
-        pwsh -Command 'ls').Length -gt 0;
+        pwsh -Command "ls").Length -gt 0;
 
     # Handle input artifacts.
     if ($PSBoundParameters.ContainsKey("Inputs"))
     {
+        # Create temporary folder for artifacts copied.
+        & "docker-compose" --project-name "$ProjectName" exec --workdir "$workspaceFolder" "vscode" `
+            pwsh -Command "New-Item -Force -ItemType 'Directory' -Path '/temp' | Out-Null";
+        
         foreach ($key in $Inputs.Keys)
         {
             # Check if the artifact to copy is one when the volume is not initialized, in which case skip it.
@@ -240,7 +243,7 @@ function Start-DevContainer
             Write-Log "Copying input artifact '$key' from host to container...";
             & "docker" cp `
                 "$($Inputs.$key.hostPath)" `
-                "$($vscodeContainerID):$workspaceFolder/$($Inputs.$key.workspacePath)";
+                "$($vscodeContainerID):/temp/$(Split-Path -Path "$Inputs.$key.hostPath" -Leaf)";
             if ($LASTEXITCODE -ne 0)
             {
                 throw "Failed to copy artifact from host to development container with error '$LASTEXITCODE'.";
