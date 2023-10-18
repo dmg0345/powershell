@@ -234,17 +234,17 @@ function Start-DevContainer
             pwsh -Command "ls").Length -gt 0;
     if (-not ($isInitialized))
     {
+        # Create folder for artifacts to be copied and for internals.
+        & "docker-compose" --project-name "$ProjectName" exec --workdir "$workspaceFolder" "vscode" `
+            pwsh -Command "New-Item -Force -ItemType 'Directory' -Path '/vol_store' | Out-Null;";
+        if ($LASTEXITCODE -ne 0)
+        {
+            throw "Failed to create 'vol_store' folder with error '$LASTEXITCODE'.";
+        }
+        
         # Handle input artifacts.
         if ($PSBoundParameters.ContainsKey("Inputs"))
         {
-            # Create folder for artifacts to be copied.
-            & "docker-compose" --project-name "$ProjectName" exec --workdir "$workspaceFolder" "vscode" `
-                pwsh -Command "New-Item -Force -ItemType 'Directory' -Path '/vol_store' | Out-Null;";
-            if ($LASTEXITCODE -ne 0)
-            {
-                throw "Failed to create 'vol_store' folder with error '$LASTEXITCODE'.";
-            }
-            
             foreach ($key in $Inputs.Keys)
             {
                 # Get name of artifact and copy it to the temporary folder.
@@ -261,16 +261,35 @@ function Start-DevContainer
         # Handle initialization script.
         if ($PSBoundParameters.ContainsKey("VolumeInitScript"))
         {
-            if (-not $isInitialized)
+            # Create temporary file where to save the temporary script.
+            $tempFile = New-TemporaryFile;
+            $fileName = Split-Path -Path "$tempFile" -Leaf;
+            try
             {
-                # Since the workspace is empty, run the initialization script.
+                # Create file with the contents of the script and copy it into the container.
+                Set-Content -Path "$tempFile" -Value $VolumeInitScript;
+                & "docker" cp "$tempFile" "$($vscodeContainerID):/vol_store/$fileName";
+                if ($LASTEXITCODE -ne 0)
+                {
+                    throw "Failed to copy initialization script into container with error '$LASTEXITCODE'.";
+                }
+                
+                # Run script.
                 Write-Log "Running initialization script for 'vscode' volume...";
-                & "docker-compose" --project-name "$ProjectName" exec --workdir "$workspaceFolder" "vscode" pwsh -Command `
-                    "$VolumeInitScript";
+                & "docker-compose" --project-name "$ProjectName" exec --workdir "$workspaceFolder" "vscode" `
+                    pwsh -File "/vol_store/$filename";
                 if ($LASTEXITCODE -ne 0)
                 {
                     throw "Initialization script for volume failed with error '$LASTEXITCODE'.";
                 }
+            }
+            finally
+            {
+                # Delete temporary file with the script in the host.
+                Remove-Item -Path $tempFile;
+                # Delete temporary file with the script in the container.
+                & "docker-compose" --project-name "$ProjectName" exec --workdir "$workspaceFolder" "vscode" `
+                    pwsh -c "if (Test-Path '/vol_store/$fileName') { Remove-Item '/vol_store/$fileName' -Force; }";
             }
         }
     }
