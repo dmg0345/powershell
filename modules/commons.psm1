@@ -301,6 +301,179 @@ function New-JSONC
     return $cnts | ConvertFrom-Json;
 }
 
+########################################################################################################################
+function New-CompilationDatabase
+{
+    <#
+    .DESCRIPTION
+        Parses a given compilation database, a 'compile_commands.json' file, obtaining relevant data from it.
+
+        This function expects the paths in the compilation database to be absolute or relative to the current
+        working directory. The sources must have a file extension of '.c' or '.cpp', and the header files of '.h' or
+        '.hpp', for C/C++ respectively.
+
+    .PARAMETER CompileCommandsJSON
+        The path to the 'compile_commands.json' file.
+
+    .OUTPUTS
+        A hashtable with the following format:
+
+        @{
+            "c_compiler" = "Absolute path to the C compiler, if used, otherwise $null.";
+            "cpp_compiler" = "Absolute path to the C++ compiler, if used, otherwise $null.";
+            "all_source_files" = @{
+                "absolute_path_to_source_file" = {
+                    "include_dirs" = @{
+                        "absolute_path_to_include_directory" = @(
+                            "absolute_path_to_header_file_0",
+                            "absolute_path_to_header_file_1"
+                        );
+                    };
+                    "definitions" = @(
+                        "DEFINITION_1",
+                        "DEFINITION_2=30"
+                    );
+                };
+            };
+            "all_include_dirs" = @(
+                "absolute_path_to_include_dir_0",
+                "absolute_path_to_include_dir_0"
+            );
+            "all_include_files" = @(
+                "absolute_path_to_header_file_0",
+                "absolute_path_to_header_file_1"
+            );
+            "all_definitions" = @(
+                "DEFINITION_1",
+                "DEFINITION_2"
+            );
+        }
+
+        Note that the include directories and include files do not include system header directories or files.
+
+    .EXAMPLE
+        New-JSONC -JSONCPath "file.jsonc";
+    #>
+    param(
+        [Parameter(Mandatory = $true)]
+        [String]
+        $CompileCommandsJSON
+    )
+
+    # Check the compilation database exists.
+    if (-not (Test-Path $CompileCommandsJSON))
+    {
+        throw "Could not find compilation database at '$CompileCommandsJSON'.";
+    }
+
+    # Parse JSON as a hashtable, and loop each item.
+    $compileCommands = New-JSONC $CompileCommandsJSON;
+    $parsed = @{
+        "c_compiler"        = $null;
+        "cpp_compiler"      = $null;
+        "all_source_files"  = @{};
+        "all_include_dirs"  = New-Object Collections.Generic.List[String];
+        "all_include_files" = New-Object Collections.Generic.List[String];
+        "all_definitions"   = New-Object Collections.Generic.List[String];
+    };
+    foreach ($cmd in $compileCommands)
+    {
+        # Define empty item to add.
+        $item = @{
+            "include_dirs" = @{};
+            "definitions"  = New-Object Collections.Generic.List[String];
+        };
+
+        # Check command consistency.
+        if (($null -eq $cmd.file) -or ($null -eq $cmd.command))
+        {
+            throw "Command in compilation database does not contain a 'file' or 'command' attribute";
+        }
+
+        # Resolve absolute path and normalize, if the path already exists in the parsed structure, then skip it.
+        $sourceFile = (Resolve-Path $cmd.file).Path;
+        if ($sourceFile -in $parsed.all_source_files.Keys)
+        {
+            continue;
+        }
+
+        # Check source file extension and verify it is a known C/C++ file.
+        if (-not ($sourceFile.EndsWith(".c") -or $sourceFile.EndsWith(".cpp")))
+        {
+            continue;
+        }
+
+        $cmdArguments = $cmd.command.Trim().Split(" ");
+        $cmdArgIndex = 0;
+        foreach ($cmdArg in $cmdArguments)
+        {
+            # Remove spaces and the beginning and end.
+            $cmdArg = $cmdArg.Trim();
+
+            # Look for C compiler if a C file and not already set.
+            if (($cmdArgIndex -eq 0) -and ($sourceFile.EndsWith(".c")) -and ($null -eq $parsed.c_compiler))
+            {
+                $parsed.c_compiler = (Resolve-Path $cmdArg).Path;
+            }
+            # Look for C++ compiler if a C++ file and not already set.
+            elseif (($cmdArgIndex -eq 0) -and ($sourceFile.EndsWith(".cpp")) -and ($null -eq $parsed.cpp_compiler))
+            {
+                $parsed.cpp_compiler = (Resolve-Path $cmdArg).Path;
+            }
+            # Look for include directories (-I).
+            elseif ($cmdArg -cmatch "^-I(.*)")
+            {
+                # Normalize path to include directory.
+                $includeDir = (Resolve-Path ($Matches[1].Trim())).Path;
+
+                # Get header files recursively and in hidden folders too.
+                $includeFiles = New-Object Collections.Generic.List[String];
+                Get-ChildItem -Path $includeDir -Force -Recurse -Include @("*.h", "*.hpp") | ForEach-Object -Process `
+                {
+                    $includeFiles.Add((Resolve-Path $_.FullName).Path);
+                }
+
+                # Add elements.
+                $item.include_dirs.Add($includeDir, $includeFiles);
+                if (-not ($includeDir -in $parsed.all_include_dirs))
+                {
+                    $parsed.all_include_dirs.Add($includeDir);
+                }
+                foreach ($includeFile in $includeFiles)
+                {
+                    if (-not ($includeFile -in $parsed.all_include_files))
+                    {
+                        $parsed.all_include_files.Add($includeFile);
+                    }
+                }
+            }
+            # Look for definitions (-D).
+            elseif ($cmdArg -cmatch "^-D(.*)")
+            {
+                # Get definition.
+                $definition = $Matches[1].Trim();
+
+                # Add elements.
+                $item.definitions.Add($definition);
+                if (-not ($definition -in $parsed.all_definitions))
+                {
+                    $parsed.all_definitions.Add($definition);
+                }
+            }
+
+            # Increase index.
+            $cmdArgIndex += 1;
+        }
+
+        # Add element to collection.
+        $parsed.all_source_files.Add($sourceFile, $item);
+    }
+
+    # Return as hashtable object.
+    return $parsed;
+}
+
+
 # [Execution] ##########################################################################################################
 Export-ModuleMember Write-Log;
 Export-ModuleMember Write-StandardOutput;
@@ -309,3 +482,4 @@ Export-ModuleMember New-SymbolicLink;
 Export-ModuleMember New-CopyItem;
 
 Export-ModuleMember New-JSONC;
+Export-ModuleMember New-CompilationDatabase;
