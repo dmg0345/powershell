@@ -231,7 +231,7 @@ function Start-DevContainer
     # Determine if the 'vscode' volume, is empty or not before copying the artifacts and running the
     # initialization script, if it is already initialized, then skip this step.
     $isInitialized = (& "docker-compose" --project-name "$ProjectName" exec --workdir "$workspaceFolder" "vscode" `
-        pwsh -Command "ls").Length -gt 0;
+            pwsh -Command "ls").Length -gt 0;
     if (-not ($isInitialized))
     {
         # Handle input artifacts.

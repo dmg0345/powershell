@@ -238,8 +238,17 @@ function Start-ClangTidy
     .PARAMETER ClangFormatExe
         Path to the 'clang-tidy' executable.
 
-    .PARAMETER Files
-        Path to the file with the source and header files to analyze. One per line.
+    .PARAMETER Filters
+        Path to wildcards to collect files from the compilation database for analysis with 'clang-tidy'. Only files
+        with the extensions '.c', '.cpp', '.h' and '.hpp' are considered.
+
+        If a header or source matches a wildcard specified, then it is added for analysis. Care should be taken with
+        the project structure as not to include header files that are not meant to be included. Wildcards are checked
+        against absolute paths and paths relative to the current working directory.
+
+        The use of clang-tidy in this way might force to maintain a certain project structure in order to include the
+        relevant headers and source files per target, the alternative is to maintain different executions for each
+        execution target, which is harder to maintain.
 
     .PARAMETER ConfigFile
         Path to the '.clang-tidy' configuration file.
@@ -261,8 +270,8 @@ function Start-ClangTidy
         $ClangTidyExe,
         [Parameter(Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
-        [String]
-        $Files,
+        [String[]]
+        $Filters,
         [Parameter(Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
         [String]
@@ -273,9 +282,35 @@ function Start-ClangTidy
         $CMakeBuildDir
     )
 
+    # Parse compilation database.
+    $parsedDB = New-CompilationDatabase $(Join-Path "$CMakeBuildDir" "compile_commands.json");
+    # Get paths to the source files and the header files.
+    Write-Log "Collecting files for analysis...";
+    $allFiles = New-Object Collections.Generic.List[String];
+    foreach ($arrayFiles in @($parsedDB.all_source_files.Keys, $parsedDB.all_include_files))
+    {
+        foreach ($file in $arrayFiles)
+        {
+            foreach ($wildcard in $Filters)
+            {
+                if (($file -like $wildcard) -or ($file -like (Join-Path $PWD $wildcard)))
+                {
+                    Write-Log "Adding file '$file' for analysis...";
+                    $allFiles.Add($file);
+                    break;
+                }
+            }
+        }
+    }
+    if ($allFiles.Count -eq 0)
+    {
+        throw "Could not collect any file for analysis with the filters specified.";
+    }
+    Write-Log "Finished collecting $($allFiles.Count) files for analysis." "Success";
+
     Write-Log "Running clang-tidy...";
     & "$ClangTidyExe" -p="$CMakeBuildDir" --config-file="$ConfigFile" `
-        --extra-arg "-Wno-unused-command-line-argument" (Get-Content -Path "$Files");
+        --extra-arg "-Wno-unused-command-line-argument" @allFiles;
     if ($LASTEXITCODE -ne 0)
     {
         throw "clang-tidy finished with error '$LASTEXITCODE', check output for details.";
@@ -293,8 +328,9 @@ function Start-ClangFormat
     .PARAMETER ClangFormatExe
         Path to the 'clang-format' executable.
 
-    .PARAMETER Files
-        Path to the file with the source and header files to analyze. One per line.
+    .PARAMETER Paths
+        Paths to '.c', '.cpp', '.h' or '.hpp' C/C++ files or directories to search recursively for files with any of
+        those extensions.
 
     .PARAMETER ConfigFile
         Path to the '.clang-format' configuration file.
@@ -303,7 +339,8 @@ function Start-ClangFormat
         This function does not return a value.
 
     .EXAMPLE
-        Start-ClangFormat -ClangFormatExe "clang-format-15" -Files @("src.c", "inc.h"); -ConfigFile ".clang-format"
+        Start-ClangFormat -ClangFormatExe "clang-format-15" -Paths @("source.c", "header.h", "src"); `
+            -ConfigFile ".clang-format"
     #>
     param (
         [Parameter(Mandatory = $true)]
@@ -312,16 +349,43 @@ function Start-ClangFormat
         $ClangFormatExe,
         [Parameter(Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
-        [String]
-        $Files,
+        [String[]]
+        $Paths,
         [Parameter(Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
         [String]
         $ConfigFile
     )
 
+    Write-Log "Collecting files for analysis...";
+    $files = @();
+    foreach ($path in $Paths)
+    {
+        if (Test-Path "$path")
+        {
+            if ((Get-Item "$path") -is [System.IO.DirectoryInfo])
+            {
+                Get-ChildItem -Path "$path" -Include @("*.c", "*.cpp", "*.h", "*.hpp") -Force -Recurse | ForEach-Object `
+                { 
+                    $files += "$($_.FullName)";
+                };
+            }
+            else
+            {
+                $files += "$input";
+            }
+        }
+    }
+    # Remove duplicates if any.
+    $files = $files | Select-Object -Unique;
+    if ($files.Count -eq 0)
+    {
+        throw "Could not collect any files with the arguments specified.";
+    }
+    Write-Log "Finished collecting $($files.Count) files for analysis." "Success";
+
     Write-Log "Running clang-format...";
-    & "$ClangFormatExe" --style="file:$ConfigFile" --dry-run --Werror --verbose (Get-Content -Path "$Files");
+    & "$ClangFormatExe" --style="file:$ConfigFile" --dry-run --Werror --verbose @files;
     if ($LASTEXITCODE -ne 0)
     {
         throw "clang-format finished with error '$LASTEXITCODE', check output for details.";
@@ -373,7 +437,7 @@ function Start-Doc8
         {
             if ((Get-Item "$input") -is [System.IO.DirectoryInfo])
             {
-                Get-ChildItem -Path "doc" -Include "*.rst" -Recurse | ForEach-Object { $files += $_.FullName };
+                Get-ChildItem -Path "doc" -Include "*.rst" -Force -Recurse | ForEach-Object { $files += $_.FullName };
             }
             elseif ($input.EndsWith(".rst"))
             {
