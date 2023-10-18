@@ -107,6 +107,9 @@ function Start-DoxygenSphinx
         Path to the root folder where the 'doxyfile' and the 'conf.py' files are located, and where the '.rst' files
         are stored.
 
+    .PARAMETER CMakeBuildDir
+        Path to the CMake build directory with the compilation database.
+
     .PARAMETER HTMLOutput
         Folder where the HTML output will be stored.
 
@@ -115,7 +118,7 @@ function Start-DoxygenSphinx
 
     .EXAMPLE
         Start-DoxygenSphinx -DoxygenExe "doxygen" -SphinxBuildExe "sphinx-build" -ConfigFolder "doc" `
-            -HTMLOutput "doc/.output"
+            -CMakeBuildDir ".cmake_build" -HTMLOutput "doc/.output"
     #>
     param (
         [Parameter(Mandatory = $true)]
@@ -130,6 +133,9 @@ function Start-DoxygenSphinx
         [ValidateNotNullOrEmpty()]
         [String]
         $ConfigFolder,
+        [ValidateNotNullOrEmpty()]
+        [String]
+        $CMakeBuildDir,
 
         [Parameter(Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
@@ -152,9 +158,22 @@ function Start-DoxygenSphinx
     }
     New-Item -Path "$doxygenBuildPath" -ItemType "Directory" -Force | Out-Null;
 
-    # Run Doxygen by feeding it from the standard input, to override command arguments.
+    # Parse compilation database, and build definitions to add.
+    $parsedDB = New-CompilationDatabase $(Join-Path "$CMakeBuildDir" "compile_commands.json");
+
+    # Run Doxygen by feeding it from the standard input, to override command arguments and supply new ones.
     Write-Log "Running Doxygen...";
-    & { Get-Content "$doxyfilePath" ; Write-Output "OUTPUT_DIRECTORY=$doxygenBuildPath" } | & "$DoxygenExe" -;
+    & { 
+        Get-Content "$doxyfilePath"; 
+        Write-Output "OUTPUT_DIRECTORY = `"$doxygenBuildPath`"";
+        if ($parsedDB.all_definitions.Count -gt 0)
+        { 
+            # Add to to variables that will be used in the preprocessor.
+            $parsedDB.all_definitions | ForEach-Object { Write-Output "PREDEFINED += $_" };
+            # Add to ENABLED_SECTIONS for conditional documentation, e.g. @if directives.
+            $parsedDB.all_definitions | ForEach-Object { Write-Output "ENABLED_SECTIONS += $_" };
+        }
+    } | & "$DoxygenExe" -;
     # If there are errors in Doxygen, then do not continue building documentation.
     if ($LASTEXITCODE -ne 0)
     {
