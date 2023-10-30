@@ -1,0 +1,42 @@
+// For format details, see https://aka.ms/devcontainer.json.
+// This is the devcontainer JSON configuration file for the Visual Studio Code Dev Containers extension.
+{
+    // Path to the 'docker-compose' file to use relative to the location of this file.
+    // Using docker-compose allows to run one to multiple containers, depending on the application.
+    "dockerComposeFile": "compose.yaml",
+    // Name of the service defined in the 'docker-compose' file which will be used in Visual Studio Code.
+    "service": "vscode",
+    // Set the workspace folder to the mapped volume to the project root folder set in 'docker-compose' file.
+    "workspaceFolder": "/workspace",
+    // Set the name of the container in Visual Studio Code user interface, this is not the same as the container name.
+    "name": "powershell_scripts",
+    // Apply customizations to tools in the container.
+    "customizations": {
+        "vscode": {
+            // Extensions to use.
+            "extensions": [
+                // Find extensions at: https://marketplace.visualstudio.com/vscode
+                // PowerShell related extensions.
+                "ms-vscode.powershell@2023.6.0",
+
+                // Other.
+                "phil294.git-log--graph@0.1.12",
+                "tyriar.theme-sapphire",
+                "github.vscode-github-actions@0.26.2" // Mainly used for validation and intellisense.
+            ],
+
+            // Set the settings.
+            "settings": {
+                // Define 'pwsh' profile for Linux enviroments, this ensures the use of Powershell in terminals.
+                "terminal.integrated.profiles.linux": {
+                    "pwsh": {
+                        "path": "pwsh",
+                        "icon": "terminal-powershell"
+                    }
+                },
+                // Set the default profile to 'pwsh' in Linux enviroments.
+                "terminal.integrated.defaultProfile.linux": "pwsh"
+            }
+        }
+    }
+}
