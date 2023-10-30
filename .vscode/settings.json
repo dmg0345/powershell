@@ -1,0 +1,68 @@
+// Visual Studio Code workspace settings.
+{
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // Visual Studio Code Settings
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // Do not show the start screen.
+    "workbench.startupEditor": "none",
+    // Render all whitespace as dots.
+    "editor.renderWhitespace": "all",
+    // Disable editor autoindentation as the formatter will handle that.
+    "editor.autoIndent": "none",
+    // Disable the minimap that appears on the right when coding.
+    "editor.minimap.enabled": false,
+    // Format files on save, except for JSON with comments files.
+    // Note that JSON files with comments are intepreted as .jsonc files.
+    "editor.formatOnSave": true,
+    "[jsonc]": {
+        "editor.formatOnSave": false
+    },
+    // Enable quick suggestions everywhere except for comments, this is useful for documentation intellisense.
+    "editor.quickSuggestions": {
+        "comments": "off",
+        "strings": true,
+        "other": "on"
+    },
+    // Do not reveal files in the explorer as they are open.
+    "explorer.autoReveal": false,
+    // Default theme.
+    "workbench.colorTheme": "Sapphire (Dim)",
+    // Increase line buffer of the integrated terminal.
+    "terminal.integrated.scrollback": 10000000,
+    // Exclude files from appearing in the explorer.
+    "files.exclude": {
+        "**/.git": true
+    },
+    // Disable detection of indentation based on content and use settings below.
+    "editor.detectIndentation": false,
+    // Configure tab sizes for files, 4 spaces by default.
+    "[*]": {"editor.tabSize": 4},
+    "[yaml]": {"editor.tabSize": 2},
+    "editor.insertSpaces": true,
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // PowerShell extension settings
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // Formatting settings.
+    "powershell.codeFormatting.openBraceOnSameLine": false,
+    // Start the terminal for intellisense and related on the background.
+    "powershell.integratedConsole.startInBackground": true,
+    "powershell.integratedConsole.showOnStartup": false,
+    // Disable PowerShell updates.
+    "powershell.promptToUpdatePowerShell": false,
+    // Disable banners when starting PowerShell.
+    "powershell.integratedConsole.suppressStartupBanner": true,
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // Github Actions extension settings
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // Disable extension, it is only used for validation and intellisense of Github Action files.
+    "github-actions.workflows.pinned.workflows": [],
+    "github-actions.workflows.pinned.refresh.enabled": false,
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // Git-Log Graph extension settings
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // Trigger from the status bar.
+    "git-log--graph.position": "editor"
+}
