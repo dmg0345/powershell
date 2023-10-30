@@ -30,17 +30,8 @@ function Start-CppCheck
     .PARAMETER CppCheckExe
         Path to the 'cppcheck' executable.
 
-    .PARAMETER PythonExe
-        Path to the 'python' executable.
-
     .PARAMETER CppCheckHTMLReportExe
         Path to the 'cppcheck-htmlreport' executable.
-
-    .PARAMETER CppCheckRulesFile
-        Optional path to the MISRA rules file, this file is confidential and should not be distributed. If provided
-        and it does not exist it will behave as if it was not provided.
-
-        When not provided, only the MISRA rule identifier is displayed.
 
     .PARAMETER SuppressionXML
         Path to the XML file with the suppressions.
@@ -63,12 +54,22 @@ function Start-CppCheck
     .PARAMETER MaxJobs
         Maximum number of jobs, this needs to be manually adjusted.
 
+    .PARAMETER CppCheckC2012RulesFile
+        Optional path to the MISRA C:2012 rules file, this file is confidential and should not be distributed.
+        If the argument is not provided, then the function does not perform any MISRA checks.
+        If a path is provided and it does not exist, then an error is raised.
+        If an empty string is provided, then MISRA checks are performed but no rule summary will be provided in the
+        errors raised, only the rule number.
+        If a path is provided and it exists, then process assumes valid MISRA C:2012 rules have been provided.
+
+        The first Python executable found in PATH environment variable is used to run the addon.
+
     .OUTPUTS
         This function does not return a value.
 
     .EXAMPLE
-        Start-CppCheck -CppCheckExe "cppcheck" -PythonExe "python" -CppCheckHTMLReportExe "cppcheck-htmlreport" `
-            -CppCheckRulesFile "cppcheck_misra_rules.txt" -SuppressionXML "suppressions.xml" `
+        Start-CppCheck -CppCheckExe "cppcheck" -CppCheckHTMLReportExe "cppcheck-htmlreport" `
+            -CppCheckC2012RulesFile "cppcheck_misra_rules.txt" -SuppressionXML "suppressions.xml" `
             -CompileCommandsJSON ".cmake/compile_commands.json" -FileFilters @("src/*", "inc/*") `
             -CppCheckBuildDir "other/cppcheck/.build" -CppCheckReportDir "other/cppcheck/.report" `
             -CppCheckSourceDir "." -MaxJobs 2;
@@ -81,15 +82,8 @@ function Start-CppCheck
         [Parameter(Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
         [String]
-        $PythonExe,
-        [Parameter(Mandatory = $true)]
-        [ValidateNotNullOrEmpty()]
-        [String]
         $CppCheckHTMLReportExe,
 
-        [Parameter(Mandatory = $false)]
-        [String]
-        $CppCheckRulesFile,
         [Parameter(Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
         [String]
@@ -118,7 +112,10 @@ function Start-CppCheck
 
         [Parameter(Mandatory = $true)]
         [Int]
-        $MaxJobs
+        $MaxJobs,
+        [Parameter(Mandatory = $false)]
+        [String]
+        $CppCheckC2012RulesFile
     )
 
     # Check build and report directories, delete them and recreate them empty, as CppCheck
@@ -146,41 +143,41 @@ function Start-CppCheck
         $fileFilterExpr += "--file-filter=$item";
     }
 
-    # Check if the MISRA rules were given and if they exist.
-    if ((-not $PSBoundParameters.ContainsKey("CppCheckRulesFile")) -or (-not (Test-Path $CppCheckRulesFile)))
+    # Generate expressions for MISRA C;2012.
+    $misraCmdArgs = @();
+    if ($PSBoundParameters.ContainsKey("CppCheckC2012RulesFile"))
     {
-        # Create MISRA JSON file in the build folder, with no additional arguments.
-        $misraJSONContents = @"
-{
-    "script": "misra.py",
-    "args": []
-}
-"@;
+        # Check if empty string, in which case the analysis runs but with no rule summary.
+        if ($CppCheckC2012RulesFile -eq "")
+        {
+            $misraJSONContents = "{`"script`": `"misra.py`", `"args`": []}";
+        }
+        # Check if file exists, in which case the analysys runs with rule summaries.
+        elseif (Test-Path $CppCheckC2012RulesFile)
+        {
+            $rulesAbsPath = (Resolve-Path $CppCheckC2012RulesFile).Path;
+            $misraJSONContents = "{`"script`": `"misra.py`", `"args`": [`"--rule-texts=$rulesAbsPath`"]}";
+        }
+        else
+        {
+            throw "CppCheck MISRA C:2012 rules provided does not exist or it is not a valid value.";
+        }
+
+        # Create MISRA JSON file in the build folder.
+        $misraJSONFile = Join-Path -Path "$CppCheckBuildDir" -ChildPath "!misra.json";
+        Set-Content -Force -Path $misraJSONFile -Value $misraJSONContents;
+        $misraJSONFile = (Resolve-Path $misraJSONFile).Path;
+
+        # Build final MISRA command line arguments.
+        $misraCmdArgs = @("--addon=$misraJSONFile", "--addon-python=python");
     }
-    else
-    {
-        # MISRA JSON contents with the path to the rules.
-        $misraJSONContents = @"
-{
-    "script": "misra.py",
-    "args": [
-        "--rule-texts=$((Resolve-Path $CppCheckRulesFile).Path)"
-    ]
-}
-"@;
-    }
-    # Create MISRA JSON file in the build folder.
-    $misraJSONFile = Join-Path -Path "$CppCheckBuildDir" -ChildPath "!misra.json";
-    Set-Content -Force -Path $misraJSONFile -Value $misraJSONContents;
-    $misraJSONFile = (Resolve-Path $misraJSONFile).Path;
 
     # Run CppCheck and generate an XML report with the results, also make it return a specific error code if
     # errors are found in the codebase.
     Write-Log "Running CppCheck with '$MaxJobs' cores...";
     $outputXMLFile = Join-Path -Path "$CppCheckBuildDir" -ChildPath "!output.xml";
     & "$CppCheckExe" `
-        --addon="$misraJSONFile" `
-        --addon-python="$PythonExe" `
+        @misraCmdArgs `
         --cppcheck-build-dir="$CppCheckBuildDir" `
         --enable="all" `
         --inline-suppr `
