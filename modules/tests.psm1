@@ -252,6 +252,7 @@ function Start-FastCov
         --header-title "Coverage Report" `
         --footer "" `
         --no-sort `
+        --ignore-errors source `
         "$(Join-Path -Path "$CoverageDir" -ChildPath "!coverage.info")";
     if ($LASTEXITCODE -ne 0)
     {
