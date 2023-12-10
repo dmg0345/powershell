@@ -307,7 +307,7 @@ function Start-ClangTidy
 
     Write-Log "Running clang-tidy...";
     & "$ClangTidyExe" -p="$CMakeBuildDir" --config-file="$ConfigFile" `
-        --extra-arg "-Wno-unused-command-line-argument" @allFiles;
+        --extra-arg "-Wno-unused-command-line-argument" --extra-arg "-Wno-unknown-warning-option" @allFiles;
     if ($LASTEXITCODE -ne 0)
     {
         throw "clang-tidy finished with error '$LASTEXITCODE', check output for details.";
