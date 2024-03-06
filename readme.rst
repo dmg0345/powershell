@@ -8,6 +8,7 @@ scripts run on *PowerShell v5*, although they are developed for use with *PowerS
 The `modules` folder contains:
 
 - *linters.psm1*, functionality related to linting tools such as *cppcheck*, *clang-tidy* or *doc8*.
+- *profilers.psm1*, functionality related to profiling tools such as *line_profiler*.
 - *documentation.psm1*, functionality related to documentation tools such as *doxygen* or *sphinx*.
 - *tests.psm1*, functionality related to test and coverage tools such as *fastcov*, *cmocka* or *junit2html*.
 - *devcontainers.psm1*, functionality related to *docker*, *docker-compose*, *vscode* and *devcontainers*.
