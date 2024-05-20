@@ -280,7 +280,7 @@ function Start-ClangTidy
     )
 
     # Parse compilation database.
-    $parsedDB = New-CompilationDatabase $(Join-Path "$CMakeBuildDir" "compile_commands.json");
+    $parsedDB = New-CompilationDatabase $(Join-Path "$CMakeBuildDir" "compile_commands.json") -NoDefinitions;
     # Get paths to the source files and the header files.
     Write-Log "Collecting files for analysis...";
     $allFiles = New-Object Collections.Generic.List[String];

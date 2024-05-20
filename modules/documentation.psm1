@@ -86,6 +86,97 @@ function Start-Sphinx
 }
 
 ########################################################################################################################
+function Start-Doxygen
+{
+    <#
+    .DESCRIPTION
+        Runs 'doxygen' to generate documentation for C/C++ projects.
+
+        The build directories for Doxygen will be in the configuration folder, in '.doxygen_build' folder. Note this
+        must be consistent with the 'doxyfile' configuration files in the same configuration folder.
+
+    .PARAMETER DoxygenExe
+        Path to the 'doxygen' executable.
+
+    .PARAMETER ConfigFolder
+        Path to the root folder where the 'doxyfile' files is located.
+
+    .PARAMETER CMakeBuildDir
+        Path to the CMake build directory with the compilation database.
+
+    .PARAMETER NoRebuild
+        Avoids doing a full rebuild of the documentation.
+
+    .OUTPUTS
+        This function does not return a value.
+
+    .EXAMPLE
+        Start-Doxygen -DoxygenExe "doxygen" -ConfigFolder "doc" -CMakeBuildDir ".cmake_build"
+    #>
+    param (
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [String]
+        $DoxygenExe,
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [String]
+        $ConfigFolder,
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [String]
+        $CMakeBuildDir,
+
+        [Parameter(Mandatory = $false)]
+        [Switch]
+        $NoRebuild
+    )
+
+    # Ensure paths to the configuration file exists.
+    $doxyfilePath = Join-Path -Path "$ConfigFolder" -ChildPath "doxyfile";
+    if (-not (Test-Path "$doxyfilePath"))
+    {
+        throw "Path '$doxyfilePath' does not exist.";
+    }
+
+    # If paths to the build and output folders exist, create them anew if requested.
+    $doxygenBuildPath = Join-Path -Path "$ConfigFolder" -ChildPath ".doxygen_build";
+    if ((-not $NoRebuild.IsPresent) -and (Test-Path "$doxygenBuildPath"))
+    {
+        Remove-Item -Path "$doxygenBuildPath" -Force -Recurse;
+    }
+    if (-not (Test-Path "$doxygenBuildPath"))
+    {
+        New-Item -Path "$doxygenBuildPath" -ItemType "Directory" -Force | Out-Null;
+    }
+
+    # Parse compilation database, and build definitions to add.
+    $parsedDB = New-CompilationDatabase $(Join-Path "$CMakeBuildDir" "compile_commands.json") -NoIncludes;
+
+    # Run Doxygen by feeding it from the standard input, to override command arguments and supply new ones.
+    Write-Log "Running Doxygen...";
+    & { 
+        Get-Content "$doxyfilePath"; 
+        Write-Output "OUTPUT_DIRECTORY = `"$doxygenBuildPath`"";
+        if ($parsedDB.all_definitions.Count -gt 0)
+        { 
+            $parsedDB.all_definitions | ForEach-Object {
+                # Add to to variables that will be used in the preprocessor.
+                Write-Output "PREDEFINED += $_"
+                # Add to ENABLED_SECTIONS for conditional documentation, e.g. @if directives.
+                Write-Output "ENABLED_SECTIONS += $_"
+            };
+        }
+    } | & "$DoxygenExe" -;
+    # If there are errors in Doxygen, then do not continue building documentation.
+    if ($LASTEXITCODE -ne 0)
+    {
+        throw "Doxygen execution finished with error '$LASTEXITCODE'.";
+    }
+    Write-Log "Doxygen execution finished successfully." "Success";
+}
+
+########################################################################################################################
 function Start-DoxygenSphinx
 {
     <#
@@ -133,6 +224,7 @@ function Start-DoxygenSphinx
         [ValidateNotNullOrEmpty()]
         [String]
         $ConfigFolder,
+        [Parameter(Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
         [String]
         $CMakeBuildDir,
@@ -143,48 +235,13 @@ function Start-DoxygenSphinx
         $HTMLOutputFolder
     )
 
-    # Ensure paths to the configuration file exists.
-    $doxyfilePath = Join-Path -Path "$ConfigFolder" -ChildPath "doxyfile";
-    if (-not (Test-Path "$doxyfilePath"))
-    {
-        throw "Path '$doxyfilePath' does not exist.";
-    }
-
-    # If paths to the build and output folders exist, create them anew.
-    $doxygenBuildPath = Join-Path -Path "$ConfigFolder" -ChildPath ".doxygen_build";
-    if (Test-Path "$doxygenBuildPath")
-    {
-        Remove-Item -Path "$doxygenBuildPath" -Force -Recurse;
-    }
-    New-Item -Path "$doxygenBuildPath" -ItemType "Directory" -Force | Out-Null;
-
-    # Parse compilation database, and build definitions to add.
-    $parsedDB = New-CompilationDatabase $(Join-Path "$CMakeBuildDir" "compile_commands.json");
-
-    # Run Doxygen by feeding it from the standard input, to override command arguments and supply new ones.
-    Write-Log "Running Doxygen...";
-    & { 
-        Get-Content "$doxyfilePath"; 
-        Write-Output "OUTPUT_DIRECTORY = `"$doxygenBuildPath`"";
-        if ($parsedDB.all_definitions.Count -gt 0)
-        { 
-            # Add to to variables that will be used in the preprocessor.
-            $parsedDB.all_definitions | ForEach-Object { Write-Output "PREDEFINED += $_" };
-            # Add to ENABLED_SECTIONS for conditional documentation, e.g. @if directives.
-            $parsedDB.all_definitions | ForEach-Object { Write-Output "ENABLED_SECTIONS += $_" };
-        }
-    } | & "$DoxygenExe" -;
-    # If there are errors in Doxygen, then do not continue building documentation.
-    if ($LASTEXITCODE -ne 0)
-    {
-        throw "Doxygen execution finished with error '$LASTEXITCODE'.";
-    }
-    Write-Log "Doxygen execution finished successfully." "Success";
-
-    # Run Sphinx, specifying the build directory.
+    # Run Doxygen first.
+    Start-Doxygen -DoxygenExe "$DoxygenExe" -ConfigFolder "$ConfigFolder" -CMakeBuildDir "$CMakeBuildDir";
+    # Run Sphinx afterwards.
     Start-Sphinx -SphinxBuildExe "$SphinxBuildExe" -ConfigFolder "$ConfigFolder" -HTMLOutput "$HTMLOutputFolder";
 }
 
 # [Execution] ##########################################################################################################
-Export-ModuleMember Start-DoxygenSphinx;
 Export-ModuleMember Start-Sphinx;
+Export-ModuleMember Start-Doxygen;
+Export-ModuleMember Start-DoxygenSphinx;
