@@ -17,25 +17,33 @@
             "extensions": [
                 // Find extensions at: https://marketplace.visualstudio.com/vscode
                 // PowerShell related extensions.
-                "ms-vscode.powershell@2023.6.0",
+                "ms-vscode.powershell@2024.2.2",
 
                 // Other.
-                "phil294.git-log--graph@0.1.12",
-                "tyriar.theme-sapphire",
+                "phil294.git-log--graph@0.1.15",
+                "tyriar.theme-sapphire@0.9.4",
                 "github.vscode-github-actions@0.26.2" // Mainly used for validation and intellisense.
             ],
 
             // Set the settings.
             "settings": {
-                // Define 'pwsh' profile for Linux enviroments, this ensures the use of Powershell in terminals.
+                // Define 'pwsh' profile for Linux enviroments, and allow to start terminals in VSCode from it.
                 "terminal.integrated.profiles.linux": {
                     "pwsh": {
-                        "path": "pwsh",
+                        "path": "/bin/pwsh",
                         "icon": "terminal-powershell"
-                    }
+                    },
+                    "sh": {
+                        "path": "/bin/sh"
+                    },
+                    "bash": null,
+                    "JavaScript Debug Terminal": null
                 },
-                // Set the default profile to 'pwsh' in Linux enviroments.
-                "terminal.integrated.defaultProfile.linux": "pwsh"
+                // Set the default profile to 'sh' in Linux enviroments, so that debug and launch work as normal.
+                "terminal.integrated.defaultProfile.linux": "sh",
+                "terminal.integrated.automationProfile.linux": {
+                    "path": "/bin/sh"
+                }
             }
         }
     }

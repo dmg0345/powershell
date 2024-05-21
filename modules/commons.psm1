@@ -315,6 +315,13 @@ function New-CompilationDatabase
     .PARAMETER CompileCommandsJSON
         The path to the 'compile_commands.json' file.
 
+    .PARAMETER NoDefinitions
+        Skips obtaining definitions from the compilation database, relevant fields in the hashtable will be empty.
+
+    .PARAMETER NoIncludes
+        Skips obtaining include directories and files from the compilation database, relevant fields in the hashtable
+        will be empty.
+
     .OUTPUTS
         A hashtable with the following format:
 
@@ -352,12 +359,20 @@ function New-CompilationDatabase
         Note that the include directories and include files do not include system header directories or files.
 
     .EXAMPLE
-        New-JSONC -JSONCPath "file.jsonc";
+        New-CompilationDatabase -CompileCommandsJSON ".cmake_build/compile_commands.json";
     #>
     param(
         [Parameter(Mandatory = $true)]
         [String]
-        $CompileCommandsJSON
+        $CompileCommandsJSON,
+
+        [Parameter(Mandatory = $false)]
+        [Switch]
+        $NoDefinitions,
+
+        [Parameter(Mandatory = $false)]
+        [Switch]
+        $NoIncludes
     )
 
     # Check the compilation database exists.
@@ -365,6 +380,10 @@ function New-CompilationDatabase
     {
         throw "Could not find compilation database at '$CompileCommandsJSON'.";
     }
+    Write-Log "Parsing compilation database at '$($CompileCommandsJSON)'...";
+
+    # Track time the parsing takes.
+    $startTime = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds();
 
     # Parse JSON as a hashtable, and loop each item.
     $compileCommands = New-JSONC $CompileCommandsJSON;
@@ -376,6 +395,8 @@ function New-CompilationDatabase
         "all_include_files" = New-Object Collections.Generic.List[String];
         "all_definitions"   = New-Object Collections.Generic.List[String];
     };
+    # Cache for include directories to speed up operations.
+    $includeDirsCache = @{};
     foreach ($cmd in $compileCommands)
     {
         # Define empty item to add.
@@ -420,41 +441,55 @@ function New-CompilationDatabase
             {
                 $parsed.cpp_compiler = (Resolve-Path $cmdArg).Path;
             }
-            # Look for include directories (-I).
-            elseif ($cmdArg -cmatch "^-I(.*)")
+            # Look for include directories (-I), if enabled.
+            elseif ((-not $NoIncludes.IsPresent) -and ($cmdArg.StartsWith("-I")))
             {
                 # Normalize path to include directory.
-                $includeDir = (Resolve-Path ($Matches[1].Trim())).Path;
+                $includeDir = (Resolve-Path ($cmdArg.SubString(2).Trim())).Path;
 
-                # Get header files recursively and in hidden folders too.
-                $includeFiles = New-Object Collections.Generic.List[String];
-                Get-ChildItem -Path $includeDir -Force -Recurse -Include @("*.h", "*.hpp") | ForEach-Object -Process `
+                # Check if include directory already in cache, and fetch the files from there.
+                if ($includeDir -in $includeDirsCache.Keys)
                 {
-                    $includeFiles.Add((Resolve-Path $_.FullName).Path);
+                    $includeFiles = $includeDirsCache[$includeDir];
+                }
+                else
+                {
+                    # Get header files recursively and in hidden folders too.
+                    $includeFiles = New-Object Collections.Generic.List[String];
+                    Get-ChildItem -Path $includeDir -Force -File -Recurse -Include @("*.h", "*.hpp") | ForEach-Object -Process `
+                    {
+                        $includeFiles.Add((Resolve-Path $_.FullName).Path);
+                    }
+                    # Add to cache.
+                    $includeDirsCache.Add($includeDir, $includeFiles);
                 }
 
-                # Add elements.
+                # Add elements to item.
                 $item.include_dirs.Add($includeDir, $includeFiles);
+
+                # Add include directory and include files to global lists if not already added.
                 if (-not ($includeDir -in $parsed.all_include_dirs))
                 {
                     $parsed.all_include_dirs.Add($includeDir);
-                }
-                foreach ($includeFile in $includeFiles)
-                {
-                    if (-not ($includeFile -in $parsed.all_include_files))
+                    foreach ($includeFile in $includeFiles)
                     {
-                        $parsed.all_include_files.Add($includeFile);
+                        if (-not ($includeFile -in $parsed.all_include_files))
+                        {
+                            $parsed.all_include_files.Add($includeFile);
+                        }
                     }
                 }
             }
-            # Look for definitions (-D).
-            elseif ($cmdArg -cmatch "^-D(.*)")
+            # Look for definitions (-D), if enabled.
+            elseif ((-not $NoDefinitions.IsPresent) -and $cmdArg.StartsWith("-D"))
             {
                 # Get definition.
-                $definition = $Matches[1].Trim();
+                $definition = $cmdArg.SubString(2).Trim();
 
-                # Add elements.
+                # Add elements to item.
                 $item.definitions.Add($definition);
+
+                # Add definitiosn to list of definitions if not already added.
                 if (-not ($definition -in $parsed.all_definitions))
                 {
                     $parsed.all_definitions.Add($definition);
@@ -468,6 +503,10 @@ function New-CompilationDatabase
         # Add element to collection.
         $parsed.all_source_files.Add($sourceFile, $item);
     }
+
+    # Track time the parsing takes.
+    $stopTime = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds();
+    Write-Log "Parsed compilation database at '$($CompileCommandsJSON)' in $($stopTime - $startTime)ms..." "Success";
 
     # Return as hashtable object.
     return $parsed;
