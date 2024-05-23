@@ -34,6 +34,9 @@ function Start-Sphinx
     .PARAMETER HTMLOutput
         Folder where the HTML output will be stored.
 
+    .PARAMETER NoRebuild
+        Avoids doing a full rebuild of the documentation.
+
     .OUTPUTS
         This function does not return a value.
 
@@ -52,7 +55,11 @@ function Start-Sphinx
         [Parameter(Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
         [String]
-        $HTMLOutputFolder
+        $HTMLOutputFolder,
+
+        [Parameter(Mandatory = $false)]
+        [Switch]
+        $NoRebuild
     )
 
     # Ensure paths to the configuration file exist.
@@ -62,22 +69,26 @@ function Start-Sphinx
         throw "Path '$confPath' does not exist.";
     }
 
-    # If paths to the build and output folders exist, create them anew.
+    # If paths to the build and output folders exist, create them anew if requested.
     $sphinxBuildPath = Join-Path -Path "$ConfigFolder" -ChildPath ".sphinx_build";
+    $docTreesPath = Join-Path -Path "$sphinxBuildPath" -ChildPath "doctrees";
     foreach ($item in @($sphinxBuildPath, $HTMLOutputFolder))
     {
-        if (Test-Path "$item")
+        if ((-not $NoRebuild.IsPresent) -and (Test-Path "$item"))
         {
             Remove-Item -Path "$item" -Force -Recurse;
         }
-        New-Item -Path "$item" -ItemType "Directory" -Force | Out-Null;
+        if (-not (Test-Path "$item"))
+        {
+            New-Item -Path "$item" -ItemType "Directory" -Force | Out-Null;
+        }
     }
 
-    # Run Sphinx, specifying the build directory.
+    # Run Sphinx and generate HTML folders.
     Write-Log "Running Sphinx...";
-    $env:BUILDDIR = "$sphinxBuildPath";
-    sphinx-build -j auto -v -W -b "html" "$ConfigFolder" "$HTMLOutputFolder";
-    $env:BUILDDIR = $null;
+    $env:BUILDDIR = $sphinxBuildPath;
+    & "$SphinxBuildExe" -M "html" "$ConfigFolder" "$HTMLOutputFolder" -j auto -v -W -d "$docTreesPath";
+    $env:BUILDDIR = $sphinxBuildPath;
     if ($LASTEXITCODE -ne 0)
     {
         throw "Sphinx execution finished with error '$LASTEXITCODE'.";
@@ -204,6 +215,9 @@ function Start-DoxygenSphinx
     .PARAMETER HTMLOutput
         Folder where the HTML output will be stored.
 
+    .PARAMETER NoRebuild
+        Avoids doing a full rebuild of the documentation.
+
     .OUTPUTS
         This function does not return a value.
 
@@ -232,13 +246,19 @@ function Start-DoxygenSphinx
         [Parameter(Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
         [String]
-        $HTMLOutputFolder
+        $HTMLOutputFolder,
+
+        [Parameter(Mandatory = $false)]
+        [Switch]
+        $NoRebuild
     )
 
     # Run Doxygen first.
-    Start-Doxygen -DoxygenExe "$DoxygenExe" -ConfigFolder "$ConfigFolder" -CMakeBuildDir "$CMakeBuildDir";
+    Start-Doxygen -DoxygenExe "$DoxygenExe" -ConfigFolder "$ConfigFolder" -CMakeBuildDir "$CMakeBuildDir" `
+        -NoRebuild:$NoRebuild;
     # Run Sphinx afterwards.
-    Start-Sphinx -SphinxBuildExe "$SphinxBuildExe" -ConfigFolder "$ConfigFolder" -HTMLOutput "$HTMLOutputFolder";
+    Start-Sphinx -SphinxBuildExe "$SphinxBuildExe" -ConfigFolder "$ConfigFolder" -HTMLOutput "$HTMLOutputFolder" `
+        -NoRebuild:$NoRebuild;
 }
 
 # [Execution] ##########################################################################################################
