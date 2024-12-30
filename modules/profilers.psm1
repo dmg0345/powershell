@@ -35,9 +35,6 @@ function Start-LineProfiler
     .PARAMETER TimeUnits
         Time units for the line profiler, defaults to '1e-6', the default of the tool.
 
-    .OUTPUTS
-        This function does not return a value.
-
     .EXAMPLE
         Start-LineProfiler -ScriptPath "benchmark.py" -OutputDir "benchmark/data" -TimeUnits "1"
     #>

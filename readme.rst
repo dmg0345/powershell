@@ -12,6 +12,7 @@ The `modules` folder contains:
 - *documentation.psm1*, functionality related to documentation tools such as *doxygen* or *sphinx*.
 - *tests.psm1*, functionality related to test and coverage tools such as *fastcov*, *cmocka* or *junit2html*.
 - *devcontainers.psm1*, functionality related to *docker*, *docker-compose*, *vscode* and *devcontainers*.
+- *commonapi.psm1*, functionality related to COVESA / GENIVI Common API C++.
 - *commons.psm1*, functionality common to all modules or that does not fit anywhere else.
 
 Working with this repository
