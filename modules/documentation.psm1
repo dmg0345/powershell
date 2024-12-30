@@ -37,9 +37,6 @@ function Start-Sphinx
     .PARAMETER NoRebuild
         Avoids doing a full rebuild of the documentation.
 
-    .OUTPUTS
-        This function does not return a value.
-
     .EXAMPLE
         Start-Sphinx -SphinxBuildExe "sphinx-build" -ConfigFolder "doc" -HTMLOutput "doc/.output"
     #>
@@ -56,7 +53,6 @@ function Start-Sphinx
         [ValidateNotNullOrEmpty()]
         [String]
         $HTMLOutputFolder,
-
         [Parameter(Mandatory = $false)]
         [Switch]
         $NoRebuild
@@ -118,9 +114,6 @@ function Start-Doxygen
     .PARAMETER NoRebuild
         Avoids doing a full rebuild of the documentation.
 
-    .OUTPUTS
-        This function does not return a value.
-
     .EXAMPLE
         Start-Doxygen -DoxygenExe "doxygen" -ConfigFolder "doc" -CMakeBuildDir ".cmake_build"
     #>
@@ -137,7 +130,6 @@ function Start-Doxygen
         [ValidateNotNullOrEmpty()]
         [String]
         $CMakeBuildDir,
-
         [Parameter(Mandatory = $false)]
         [Switch]
         $NoRebuild
@@ -218,9 +210,6 @@ function Start-DoxygenSphinx
     .PARAMETER NoRebuild
         Avoids doing a full rebuild of the documentation.
 
-    .OUTPUTS
-        This function does not return a value.
-
     .EXAMPLE
         Start-DoxygenSphinx -DoxygenExe "doxygen" -SphinxBuildExe "sphinx-build" -ConfigFolder "doc" `
             -CMakeBuildDir ".cmake_build" -HTMLOutput "doc/.output"
@@ -242,12 +231,10 @@ function Start-DoxygenSphinx
         [ValidateNotNullOrEmpty()]
         [String]
         $CMakeBuildDir,
-
         [Parameter(Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
         [String]
         $HTMLOutputFolder,
-
         [Parameter(Mandatory = $false)]
         [Switch]
         $NoRebuild

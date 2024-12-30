@@ -64,9 +64,6 @@ function Start-CppCheck
 
         The first Python executable found in PATH environment variable is used to run the addon.
 
-    .OUTPUTS
-        This function does not return a value.
-
     .EXAMPLE
         Start-CppCheck -CppCheckExe "cppcheck" -CppCheckHTMLReportExe "cppcheck-htmlreport" `
             -CppCheckC2012RulesFile "cppcheck_misra_rules.txt" -SuppressionXML "suppressions.xml" `
@@ -83,7 +80,6 @@ function Start-CppCheck
         [ValidateNotNullOrEmpty()]
         [String]
         $CppCheckHTMLReportExe,
-
         [Parameter(Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
         [String]
@@ -96,7 +92,6 @@ function Start-CppCheck
         [ValidateNotNullOrEmpty()]
         [String[]]
         $FileFilters,
-
         [Parameter(Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
         [String]
@@ -109,7 +104,6 @@ function Start-CppCheck
         [ValidateNotNullOrEmpty()]
         [String]
         $CppCheckSourceDir,
-
         [Parameter(Mandatory = $true)]
         [Int]
         $MaxJobs,
@@ -253,9 +247,6 @@ function Start-ClangTidy
     .PARAMETER CMakeBuildDir
         CMake build directory where the 'compile_commands.json' file is generated.
 
-    .OUTPUTS
-        This function does not return a value.
-
     .EXAMPLE
         Start-ClangTidy -ClangTidyExe "clang-tidy-15" -Files @("src.c", "inc.h"); -ConfigFile ".clang-tidy" `
             -CMakeBuildDir ".cmake_build"
@@ -332,9 +323,6 @@ function Start-ClangFormat
     .PARAMETER ConfigFile
         Path to the '.clang-format' configuration file.
 
-    .OUTPUTS
-        This function does not return a value.
-
     .EXAMPLE
         Start-ClangFormat -ClangFormatExe "clang-format-15" -Paths @("source.c", "header.h", "src"); `
             -ConfigFile ".clang-format"
@@ -406,9 +394,6 @@ function Start-Doc8
     .PARAMETER Inputs
         Array of directory and/or file inputs to recursively collect '.rst' files for analysis.
 
-    .OUTPUTS
-        This function does not return a value.
-
     .EXAMPLE
         Start-Doc8 -Doc8Exe "doc8" -ConfigFile "pyproject.toml" -Inputs @("file.rst", "dir")
     #>
@@ -468,9 +453,6 @@ function Start-Pylint
     .PARAMETER Inputs
         Directories and/or files to run pylint on, there will be a separate execution for each pylint input.
 
-    .OUTPUTS
-        This function does not return a value.
-
     .EXAMPLE
         Start-Pylint -PylintExe "pylint" -ConfigFile "pyproject.toml" -Inputs @("src", "tests")
     #>
@@ -524,9 +506,6 @@ function Start-Pyright
     .PARAMETER Inputs
         Directories and/or files to run pyright on, there will be a separate execution for each pyright input.
 
-    .OUTPUTS
-        This function does not return a value.
-
     .EXAMPLE
         Start-Pyright -PyrightExe "pyright" -ConfigFile "pyproject.toml" -Inputs @("src", "tests")
     #>
@@ -579,9 +558,6 @@ function Start-Black
 
     .PARAMETER Inputs
         Directories and/or files to run black on, there will be a separate execution for each black input.
-
-    .OUTPUTS
-        This function does not return a value.
 
     .EXAMPLE
         Start-Black -BlackExe "black" -ConfigFile "pyproject.toml" -Inputs @("src", "tests")

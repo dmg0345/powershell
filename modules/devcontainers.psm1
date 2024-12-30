@@ -56,9 +56,6 @@ function Initialize-DevContainer
 
         The 'containerPath' is the path in the container.
 
-    .OUTPUTS
-        This function does not return a value.
-
     .EXAMPLE
         Initialize-DevContainer -DevcontainerFile ".devcontainer/devcontainer.json" -ProjectName "project"
     #>
@@ -175,9 +172,6 @@ function Start-DevContainer
 
         The artifacts are copied to "/vol_store" folder, from there, they can be interacted with from the
         initialization script.
-
-    .OUTPUTS
-        This function does not return a value.
 
     .EXAMPLE
         Start-DevContainer -DevcontainerFile ".devcontainer/devcontainer.json" -ProjectName "project"

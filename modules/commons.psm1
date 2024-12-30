@@ -25,11 +25,8 @@ function Write-Log
     .PARAMETER Level
         Foreground color of the message, one of "Success", "Error" or "Info", defaults to "Info".
 
-    .OUTPUTS
-        This function does not return a value.
-
     .EXAMPLE
-        Write-Host -Message "Hello World" -Level "Info";
+        Write-Log -Message "Hello World" -Level "Info";
     #>
     param (
         [Parameter(Mandatory = $true)]
@@ -129,9 +126,6 @@ function New-SymbolicLink
         The relative path, file or directory, to which the symbolic link resolves, relative to the parent directory of
         the parameter Path.
 
-    .OUTPUTS
-        This function does not return a value.
-
     .EXAMPLE
         New-SymbolicLink -Path "src/project" -Target "./../other/project/src";
     #>
@@ -219,9 +213,6 @@ function New-CopyItem
     .PARAMETER Destination
         The file or directory that will be created.
 
-    .OUTPUTS
-        This function does not return a value.
-
     .EXAMPLE
         New-CopyItem -Source "path/to/source" -Destination "path/to/destination";
     #>
@@ -258,6 +249,26 @@ function New-CopyItem
     Copy-Item -Path "$Source" -Destination "$Destination" -Force -Recurse;
 
     Write-Log "Copied item from '$((Resolve-Path $Source).Path)' to '$((Resolve-Path $Destination).Path)'..." "Success";
+}
+
+########################################################################################################################
+function New-TemporaryFolder
+{
+    <#
+    .DESCRIPTION
+        Creates a new temporary folder.
+
+    .OUTPUTS
+        The path to the temporary folder.
+
+    .EXAMPLE
+        $tempFolder = New-TemporaryFolder;
+    #>
+    param()
+    
+    return New-TemporaryFile | ForEach-Object {
+        Remove-Item $_ -Force; New-Item -Path "$($_.FullName)" -ItemType Directory -Force | Out-Null; $_.FullName;
+    };
 }
 
 ########################################################################################################################
@@ -365,11 +376,9 @@ function New-CompilationDatabase
         [Parameter(Mandatory = $true)]
         [String]
         $CompileCommandsJSON,
-
         [Parameter(Mandatory = $false)]
         [Switch]
         $NoDefinitions,
-
         [Parameter(Mandatory = $false)]
         [Switch]
         $NoIncludes
@@ -512,6 +521,81 @@ function New-CompilationDatabase
     return $parsed;
 }
 
+########################################################################################################################
+function Remove-FromCompilationDatabase
+{
+    <#
+    .DESCRIPTION
+        Removes entries from a compilation database, generating one with the result.
+
+    .PARAMETER InputCompileCommandsJSON
+        The path to the input 'compile_commands.json' file.
+
+    .PARAMETER OutputCompileCommandsJSON
+        The path to the output 'compile_commands.json' file, with the removed entries.
+
+    .PARAMETER Regex
+        Regular expression that will result in the entry being deleted if it results in a match in the 'command'
+        key-value pair.
+
+    .OUTPUTS
+        The deleted entries.
+
+    .EXAMPLE
+        Remove-FromCompilationDatabase './cmake_build/compile_commands.json' './cp_0.json' '-DDEF0';
+    #>
+    param(
+        [Parameter(Mandatory = $true)]
+        [String]
+        $InputCompileCommandsJSON,
+        [Parameter(Mandatory = $true)]
+        [String]
+        $OutputCompileCommandsJSON,
+        [Parameter(Mandatory = $true)]
+        [String]
+        $Regex
+    )
+
+    # Check the input compilation database exists.
+    if (-not (Test-Path $InputCompileCommandsJSON))
+    {
+        throw "Could not find input compilation database at '$InputCompileCommandsJSON'.";
+    }
+    Write-Log "Parsing compilation database at '$($InputCompileCommandsJSON)'...";
+
+    # Parse input compile commands as a hashtable, and loop each item.
+    $inputCompileCommands = New-JSONC $InputCompileCommandsJSON;
+    $deletedEntries = @(); $keptEntries = @();
+    foreach ($inputCmd in $inputCompileCommands)
+    {
+        # Check command consistency.
+        if (($null -eq $inputCmd.file) -or ($null -eq $inputCmd.command))
+        {
+            throw "Command in compilation database does not contain a 'file' or 'command' attribute";
+        }
+
+        # Perform regular expression check on 'command', and assign the entry accordingly to kept or deleted entries.
+        if ($inputCmd.command -match "$($Regex)")
+        {
+            Write-Log "Regex '$($Regex)' match, deleting entry for file '$($inputCmd.file)'...";
+            $deletedEntries += $inputCmd;
+        }
+        else
+        {
+            $keptEntries += $inputCmd;
+        }
+    }
+
+    # Save JSON to file, overwriting it if it exists, creating the file if not.
+    ConvertTo-Json $keptEntries | Set-Content -Path "$($OutputCompileCommandsJSON)" -Force -Encoding utf8;
+
+    # Print the location of the generated compilation database.
+    Write-Log "Generated compilation database at '$($OutputCompileCommandsJSON)'." "Success";
+
+    # Return deleted entries.
+    return $deletedEntries;
+}
+
 
 # [Execution] ##########################################################################################################
 Export-ModuleMember Write-Log;
@@ -519,6 +603,9 @@ Export-ModuleMember Write-StandardOutput;
 
 Export-ModuleMember New-SymbolicLink;
 Export-ModuleMember New-CopyItem;
+Export-ModuleMember New-TemporaryFolder;
 
 Export-ModuleMember New-JSONC;
+
 Export-ModuleMember New-CompilationDatabase;
+Export-ModuleMember Remove-FromCompilationDatabase;
