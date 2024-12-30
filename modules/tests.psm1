@@ -33,9 +33,6 @@ function Start-CMockaHTML
 
         In this folder, the file 'test_report.html' will be created, along with multiple XML files parsed.
 
-    .OUTPUTS
-        This function does not return a value.
-
     .EXAMPLE
         ctest -VV -O "./tests/.test_results/output.log" --no-tests=error --test-dir "./.cmake_build";
         Start-CMockaHTML -JUnit2HTMLExe "junit2html" -OutputFolder "./tests/.test_results";
@@ -161,9 +158,6 @@ function Start-GoogleTestHTML
 
         In this folder, the file 'test_report.html' will be created.
 
-    .OUTPUTS
-        This function does not return a value.
-
     .EXAMPLE
         Start-GoogleTestHTML -JUnit2HTMLExe "junit2html" -OutputFolder "./tests/.test_results";
     #>
@@ -235,9 +229,6 @@ function Start-FastCov
     .PARAMETER CMakeBuildDir
         Folder with the CMake build distributables.
 
-    .OUTPUTS
-        This function does not return a value.
-
     .EXAMPLE
         Start-FastCov -FastCovExe "fastcov" -LCovGenHTMLExe "genhtml" -Include @("src", "tests") `
             -CoverageDir ".coverage" -CMakeBuildDir ".cmake_build"
@@ -255,7 +246,6 @@ function Start-FastCov
         [ValidateNotNullOrEmpty()]
         [String[]]
         $Include,
-
         [Parameter(Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
         [String]
