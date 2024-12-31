@@ -561,7 +561,7 @@ function Remove-FromCompilationDatabase
     {
         throw "Could not find input compilation database at '$InputCompileCommandsJSON'.";
     }
-    Write-Log "Parsing compilation database at '$($InputCompileCommandsJSON)'...";
+    Write-Log "Removing entries with match '$($Regex)' from compilation database at '$($InputCompileCommandsJSON)'...";
 
     # Parse input compile commands as a hashtable, and loop each item.
     $inputCompileCommands = New-JSONC $InputCompileCommandsJSON;
@@ -585,12 +585,20 @@ function Remove-FromCompilationDatabase
             $keptEntries += $inputCmd;
         }
     }
+    # Print number of entries deleted and kept for informational purposes.
+    Write-Log "$($keptEntries.Length) entries kept, $($deletedEntries.Length)' entries deleted...";
+
+    # If the file doesn't exist, create it anew so that the directory structure eixsts.
+    if (-not (Test-Path $OutputCompileCommandsJSON))
+    {
+        New-Item -Path "$($OutputCompileCommandsJSON)" -ItemType File -Force | Out-Null;
+    } 
 
     # Save JSON to file, overwriting it if it exists, creating the file if not.
     ConvertTo-Json $keptEntries | Set-Content -Path "$($OutputCompileCommandsJSON)" -Force -Encoding utf8;
 
     # Print the location of the generated compilation database.
-    Write-Log "Generated compilation database at '$($OutputCompileCommandsJSON)'." "Success";
+    Write-Log "New compilation database at '$($OutputCompileCommandsJSON)." "Success";
 
     # Return deleted entries.
     return $deletedEntries;
