@@ -122,7 +122,8 @@ function New-CommonAPIGeneration
                         --dest-common "$($input.coreDir)/common" `
                         --dest-proxy "$($input.coreDir)/proxy" `
                         --dest-stub "$($input.coreDir)/stub" `
-                        --dest-subdirs --searchpath "$($tempFolder)" --printfiles;
+                        --dest-skel "$($input.coreDir)/skel" `
+                        --dest-subdirs --skel --searchpath "$($tempFolder)" --printfiles;
                     if ($LASTEXITCODE -ne 0) { throw "Failed to run core generator on folder '$($input.fidlDir)'."; }
                     Write-Log "Finished generating core source code from for '$($input.fidlDir)'..." "Success";
                 }
